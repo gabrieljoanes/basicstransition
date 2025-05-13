@@ -1,9 +1,7 @@
-```python
 import streamlit as st
 from openai import OpenAI
 import json
 
-# **ADD**: load your JSONL of examples
 @st.cache_data
 def load_transitions(path="transitions.jsonl"):
     examples = []
@@ -12,10 +10,8 @@ def load_transitions(path="transitions.jsonl"):
             examples.append(json.loads(line)["transition"])
     return examples
 
-# **UPDATE**: point at your local file (ensure transitions.jsonl is in your repo)
 transition_examples = load_transitions("transitions.jsonl")
 
-# initialize the OpenAI client
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 st.title("🧠 Multi-Transition Generator (GPT-4)")
@@ -35,7 +31,6 @@ if st.button("✨ Generate Transitions"):
         suggestions = []
         rebuilt = parts[0]
 
-        # track which keywords/transitions we’ve already used
         used_keywords = set()
         used_transitions = set()
 
@@ -43,7 +38,6 @@ if st.button("✨ Generate Transitions"):
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
 
-            # **UPDATE**: build a richer system prompt using your JSONL examples
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
@@ -68,9 +62,7 @@ if st.button("✨ Generate Transitions"):
                 st.error(f"Error generating transition #{i+1}: {e}")
                 trans = "[ERROR]"
 
-            # **POST-PROCESSING RULES**
-
-            # 1) Remove duplicate trailing article (e.g., "... la La ...")
+            # 1) Remove duplicate trailing article
             lower_ctx = prev_ctx.lower()
             for art in ("la", "le", "l'", "les"):
                 if lower_ctx.endswith(f" {art}") and trans.lower().startswith(f"{art}"):
@@ -85,19 +77,19 @@ if st.button("✨ Generate Transitions"):
                     tail = tail[0].lower() + tail[1:]
                 trans = f"{head}, {tail}"
 
-            # 3) Enforce “enfin” only as last transition
+            # 3) “Enfin” only as the last transition
             is_last = (i == len(parts) - 2)
             if trans.lower().startswith("enfin") and not is_last:
                 trans = trans.replace("Enfin", "De plus", 1)
 
-            # 4) Allow “par ailleurs” only once
+            # 4) “Par ailleurs” only once
             if "par ailleurs" in trans.lower():
                 if "par ailleurs" in used_keywords:
                     trans = trans.replace("Par ailleurs", "De plus", 1)
                 else:
                     used_keywords.add("par ailleurs")
 
-            # 5) Avoid exact repeats of any transition
+            # 5) Avoid exact repeats
             norm = trans.lower()
             if norm in used_transitions:
                 trans = trans + " (suite)"
@@ -106,12 +98,9 @@ if st.button("✨ Generate Transitions"):
             suggestions.append(trans)
             rebuilt += trans + parts[i+1]
 
-        # show each suggestion
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
             st.markdown(f"{idx}. **{t}**")
 
-        # show final rebuilt text
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
-```
