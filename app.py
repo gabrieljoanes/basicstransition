@@ -58,6 +58,13 @@ if st.button("✨ Generate Transitions"):
                     max_tokens=20
                 )
                 trans = resp.choices[0].message.content.strip()
+
+                # ── **INSERT DUPLICATE-ARTICLE FILTER HERE** ──
+                lower_ctx = prev_ctx.lower()
+                for art in ("la", "le", "l'", "les"):
+                    if lower_ctx.endswith(f" {art}") and trans.lower().startswith(f"{art}"):
+                        # remove the leading article + any following space
+                        trans = trans[len(art):].lstrip()
             except Exception as e:
                 st.error(f"Error generating transition #{i+1}: {e}")
                 trans = "[ERROR]"
