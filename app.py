@@ -37,15 +37,15 @@ if st.button("✨ Generate Transitions"):
 
         for i in range(len(parts) - 1):
             prev_ctx = parts[i].strip().split("\n")[-1]
-            next_ctx = parts[i+1].lstrip().split("\n")[0]
+            next_full = parts[i+1].lstrip()
+            next_ctx = next_full.split("\n")[0]
 
-            # Special header handling: pass through after double line-break
+            # Handle departmental header with double blank lines
             if prev_ctx.strip() == "A savoir également dans votre département":
-                # Remove any trailing whitespace, add two line breaks, then the next content
-                rebuilt = rebuilt.rstrip() + "\n\n" + parts[i+1]
+                rebuilt = rebuilt.rstrip() + "\n\nA savoir également dans votre département\n\n" + next_full
                 continue
 
-            # Build system prompt with example transitions
+            # Build system prompt with sample examples
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
@@ -104,23 +104,33 @@ if st.button("✨ Generate Transitions"):
             used_transitions.add(norm)
 
             suggestions.append(trans)
-            rebuilt += trans + parts[i+1]
 
-        # === FINAL CLEANUP ON FULL TEXT ===
-        # a) Lowercase article after any comma
+            # Remove overlapping text between transition end and next paragraph start
+            overlap = ""
+            max_len = min(len(trans), len(next_ctx))
+            for l in range(max_len, 0, -1):
+                if trans.endswith(next_ctx[:l]):
+                    overlap = next_ctx[:l]
+                    break
+            if overlap:
+                cleaned_next = next_full[len(overlap):]
+            else:
+                cleaned_next = next_full
+
+            rebuilt += trans + cleaned_next
+
+        # Final cleanup on full text
         rebuilt = re.sub(
             r',\s+(Le|La|L\')',
             lambda m: ', ' + m.group(1).lower(),
             rebuilt
         )
-        # b) Fix duplicated “et de Les” → “et les”
         rebuilt = re.sub(r'\bet de Les\b', 'et les', rebuilt)
-        # c) Collapse multiple spaces
         rebuilt = re.sub(r'\s{2,}', ' ', rebuilt)
 
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
-            st.markdown(f"{idx}. **{t}**")
+            st.markdown(f"{idx}. {t}")
 
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
