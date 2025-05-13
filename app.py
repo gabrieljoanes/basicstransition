@@ -1,5 +1,18 @@
 import streamlit as st
 from openai import OpenAI
+import json                                        # **ADD**: to parse JSONL
+
+# **ADD**: load your JSONL of examples
+@st.cache_data
+def load_transitions(path="transitions.jsonl"):
+    examples = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            examples.append(json.loads(line)["transition"])
+    return examples
+
+# **ADD**: call at startup (adjust path if needed)
+transition_examples = load_transitions("/mnt/data/transitions.jsonl")
 
 # initialize the OpenAI client
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -10,7 +23,6 @@ st.markdown(
     "The app will suggest a 5–10 word phrase for each and rebuild the text."
 )
 
-# single text area for the full text
 text_input = st.text_area("📝 Text with TRANSITION placeholders", height=300)
 
 if st.button("✨ Generate Transitions"):
@@ -22,22 +34,22 @@ if st.button("✨ Generate Transitions"):
         rebuilt = parts[0]
 
         for i in range(len(parts) - 1):
-            # grab the end of the previous chunk and the start of the next
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
 
-            # ask GPT-4 for a single transition
+            # **UPDATE**: build a richer system prompt using your JSONL examples
+            system_prompt = (
+                "You are a French news assistant that replaces the word TRANSITION "
+                "with a short, natural and context-aware phrase (5–10 words) that logically "
+                "connects the two sentences. Here are some examples of good transitions:\n"
+                + "\n".join(f"- {t}" for t in transition_examples[:10])  # pick first 10
+            )
+
             messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a French news assistant that replaces the "
-                        "word TRANSITION with a short, natural and context-aware "
-                        "phrase (5–10 words) that logically connects the two sentences."
-                    )
-                },
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"{prev_ctx}\nTRANSITION\n{next_ctx}"}
             ]
+
             try:
                 resp = client.chat.completions.create(
                     model="gpt-4",
@@ -51,14 +63,11 @@ if st.button("✨ Generate Transitions"):
                 trans = "[ERROR]"
 
             suggestions.append(trans)
-            # stitch it back together
             rebuilt += trans + parts[i+1]
 
-        # show each suggestion
         st.subheader("✅ Suggested Transitions")
         for idx, trans in enumerate(suggestions, start=1):
             st.markdown(f"{idx}. **{trans}**")
 
-        # show final rebuilt text
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
