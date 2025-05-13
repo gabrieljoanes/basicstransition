@@ -34,19 +34,11 @@ if st.button("✨ Generate Transitions"):
 
         used_keywords = set()
         used_transitions = set()
-        used_prefixes = set()  # track first-segment prefixes to prevent near-duplicates
 
         for i in range(len(parts) - 1):
             prev_ctx = parts[i].strip().split("\n")[-1]
-            next_full = parts[i+1].lstrip()
-            next_ctx = next_full.split("\n")[0]
+            next_ctx = parts[i+1].lstrip().split("\n")[0]
 
-            # Handle departmental header with double blank lines
-            if prev_ctx.strip() == "A savoir également dans votre département":
-                rebuilt = rebuilt.rstrip() + "\n\nA savoir également dans votre département\n\n" + next_full
-                continue
-
-            # Build system prompt with sample examples
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
@@ -104,47 +96,24 @@ if st.button("✨ Generate Transitions"):
                 trans = trans + " (suite)"
             used_transitions.add(norm)
 
-            # 6) Prevent same-prefix repeats
-            #   define prefix as segment up to first comma or first 3 words
-            if "," in trans:
-                prefix = trans.split(",", 1)[0].lower().strip()
-                rest = trans.split(",", 1)[1].lstrip()
-            else:
-                words = trans.split()
-                prefix = " ".join(words[:3]).lower()
-                rest = " ".join(words[3:]).lstrip()
-
-            if prefix in used_prefixes:
-                # fallback: use "De plus," to vary opening
-                trans = f"De plus, {rest}" if rest else f"De plus, {prefix}"
-            else:
-                used_prefixes.add(prefix)
-
             suggestions.append(trans)
+            rebuilt += trans + parts[i+1]
 
-            # Remove overlapping text between transition end and next paragraph start
-            overlap = ""
-            max_len = min(len(trans), len(next_ctx))
-            for l in range(max_len, 0, -1):
-                if trans.endswith(next_ctx[:l]):
-                    overlap = next_ctx[:l]
-                    break
-            cleaned_next = next_full[len(overlap):] if overlap else next_full
-
-            rebuilt += trans + cleaned_next
-
-        # Final cleanup on full text
+        # === FINAL CLEANUP ON FULL TEXT ===
+        # a) Lowercase article after any comma
         rebuilt = re.sub(
             r',\s+(Le|La|L\')',
             lambda m: ', ' + m.group(1).lower(),
             rebuilt
         )
+        # b) Fix duplicated “et de Les” → “et les”
         rebuilt = re.sub(r'\bet de Les\b', 'et les', rebuilt)
+        # c) Collapse multiple spaces
         rebuilt = re.sub(r'\s{2,}', ' ', rebuilt)
 
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
-            st.markdown(f"{idx}. {t}")
+            st.markdown(f"{idx}. **{t}**")
 
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
