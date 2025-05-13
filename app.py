@@ -59,6 +59,37 @@ if st.button("✨ Generate Transitions"):
                 )
                 trans = resp.choices[0].message.content.strip()
 
+                 # **UPDATE**: 1) lowercase after comma
+            if "," in trans:
+                head, tail = trans.split(",", 1)
+                tail = tail.lstrip()
+                if tail:
+                    tail = tail[0].lower() + tail[1:]
+                trans = f"{head}, {tail}"
+
+            # **UPDATE**: 2) enforce “enfin” only as last transition
+            is_last = (i == len(parts) - 2)
+            if trans.lower().startswith("enfin") and not is_last:
+                trans = trans.replace("Enfin", "De plus", 1)
+
+            # **UPDATE**: 3) enforce “par ailleurs” only once
+            if "par ailleurs" in trans.lower():
+                if "par ailleurs" in used_keywords:
+                    # swap to another phrase if already used
+                    trans = trans.replace("Par ailleurs", "De plus", 1)
+                else:
+                    used_keywords.add("par ailleurs")
+
+            # **UPDATE**: 4) avoid exact repeats
+            norm = trans.lower()
+            if norm in used_transitions:
+                # simple fallback when duplicate: append “(suite)”
+                trans = trans + " (suite)"
+            used_transitions.add(trans.lower())
+
+            suggestions.append(trans)
+            rebuilt += trans + parts[i+1]
+
                 # ── **INSERT DUPLICATE-ARTICLE FILTER HERE** ──
                 lower_ctx = prev_ctx.lower()
                 for art in ("la", "le", "l'", "les"):
