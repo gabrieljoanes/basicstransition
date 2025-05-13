@@ -11,8 +11,8 @@ def load_transitions(path="transitions.jsonl"):
             examples.append(json.loads(line)["transition"])
     return examples
 
-# **ADD**: call at startup (adjust path if needed)
-transition_examples = load_transitions("/mnt/data/transitions.jsonl")
+# **UPDATE**: point at your local file
+transition_examples = load_transitions("transitions.jsonl")
 
 # initialize the OpenAI client
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
