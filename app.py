@@ -1,6 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 import json
+import re
 
 @st.cache_data
 def load_transitions(path="transitions.jsonl"):
@@ -17,8 +18,8 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.title("🧠 Multi-Transition Generator (GPT-4)")
 st.markdown(
     "Paste your text with one or more `TRANSITION` markers. "
-    "The app will suggest a 5–10 word phrase for each, apply several post-processing rules, "
-    "and rebuild the text."
+    "The app will suggest a 5–10 word phrase for each, apply post-processing rules, "
+    "and rebuild the text with grammar & punctuation checks."
 )
 
 text_input = st.text_area("📝 Text with TRANSITION placeholders", height=300)
@@ -41,7 +42,7 @@ if st.button("✨ Generate Transitions"):
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
-                "connects the two sentences. Here are some examples of good transitions:\n"
+                "connects the two sentences. Here are some examples:\n"
                 + "\n".join(f"- {t}" for t in transition_examples[:10])
             )
 
@@ -69,7 +70,7 @@ if st.button("✨ Generate Transitions"):
                     trans = trans[len(art):].lstrip()
                     break
 
-            # 2) After a comma, lowercase the first letter of the next clause
+            # 2) Lowercase after comma
             if "," in trans:
                 head, tail = trans.split(",", 1)
                 tail = tail.lstrip()
@@ -97,6 +98,18 @@ if st.button("✨ Generate Transitions"):
 
             suggestions.append(trans)
             rebuilt += trans + parts[i+1]
+
+        # === FINAL CLEANUP ON FULL TEXT ===
+        # a) Lowercase article after any comma
+        rebuilt = re.sub(
+            r',\s+(Le|La|L\')',
+            lambda m: ', ' + m.group(1).lower(),
+            rebuilt
+        )
+        # b) Fix duplicated “et de Les” → “et les”
+        rebuilt = re.sub(r'\bet de Les\b', 'et les', rebuilt)
+        # c) Collapse multiple spaces
+        rebuilt = re.sub(r'\s{2,}', ' ', rebuilt)
 
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
