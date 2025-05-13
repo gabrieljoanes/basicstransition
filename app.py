@@ -1,35 +1,64 @@
 import streamlit as st
 from openai import OpenAI
 
-# initialize the new client
+# initialize the OpenAI client
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-st.title("🧠 Transition Generator (GPT-4)")
-st.markdown("Enter two paragraphs. The app will generate a short, natural transition between them.")
+st.title("🧠 Multi-Transition Generator (GPT-4)")
+st.markdown(
+    "Paste your text with one or more `TRANSITION` markers. "
+    "The app will suggest a 5–10 word phrase for each and rebuild the text."
+)
 
-para_a = st.text_area("🅰️ Paragraph A", height=150)
-para_b = st.text_area("🅱️ Paragraph B", height=150)
+# single text area for the full text
+text_input = st.text_area("📝 Text with TRANSITION placeholders", height=300)
 
-if st.button("✨ Generate Transition"):
-    prompt = f"{para_a}\nTRANSITION\n{para_b}"
-    messages = [
-        {"role": "system", "content": "You are a French news assistant that replaces the word TRANSITION with a short, natural and context-aware phrase (5–10 words) that logically connects the two paragraphs."},
-        {"role": "user", "content": "Le club de tennis de Rennes a organisé un tournoi pour les jeunes.\nTRANSITION\nUn incendie s’est déclaré dans un entrepôt du centre-ville."},
-        {"role": "assistant", "content": "Dans l’actualité locale, un"},
-        {"role": "user", "content": "Le marché de Noël d’Arras a accueilli des milliers de visiteurs.\nTRANSITION\nLe conseil municipal a débattu d’un plan pour les transports publics."},
-        {"role": "assistant", "content": "Sur le plan politique local, le"},
-        {"role": "user", "content": prompt}
-    ]
+if st.button("✨ Generate Transitions"):
+    if "TRANSITION" not in text_input:
+        st.warning("No `TRANSITION` markers found. Please add at least one.")
+    else:
+        parts = text_input.split("TRANSITION")
+        suggestions = []
+        rebuilt = parts[0]
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=20
-        )
-        transition = response.choices[0].message.content.strip()
-        st.success("✅ Suggested Transition:")
-        st.markdown(f"**{transition}**")
-    except Exception as e:
-        st.error(f"⚠️ Error: {e}")
+        for i in range(len(parts) - 1):
+            # grab the end of the previous chunk and the start of the next
+            prev_ctx = parts[i].strip().split("\n")[-1]
+            next_ctx = parts[i+1].lstrip().split("\n")[0]
+
+            # ask GPT-4 for a single transition
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a French news assistant that replaces the "
+                        "word TRANSITION with a short, natural and context-aware "
+                        "phrase (5–10 words) that logically connects the two sentences."
+                    )
+                },
+                {"role": "user", "content": f"{prev_ctx}\nTRANSITION\n{next_ctx}"}
+            ]
+            try:
+                resp = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=20
+                )
+                trans = resp.choices[0].message.content.strip()
+            except Exception as e:
+                st.error(f"Error generating transition #{i+1}: {e}")
+                trans = "[ERROR]"
+
+            suggestions.append(trans)
+            # stitch it back together
+            rebuilt += trans + parts[i+1]
+
+        # show each suggestion
+        st.subheader("✅ Suggested Transitions")
+        for idx, trans in enumerate(suggestions, start=1):
+            st.markdown(f"{idx}. **{trans}**")
+
+        # show final rebuilt text
+        st.subheader("📄 Final Text")
+        st.text_area("Result", rebuilt, height=300)
