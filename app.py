@@ -1,6 +1,7 @@
+```python
 import streamlit as st
 from openai import OpenAI
-import json                                        # **ADD**: to parse JSONL
+import json
 
 # **ADD**: load your JSONL of examples
 @st.cache_data
@@ -11,7 +12,7 @@ def load_transitions(path="transitions.jsonl"):
             examples.append(json.loads(line)["transition"])
     return examples
 
-# **UPDATE**: point at your local file
+# **UPDATE**: point at your local file (ensure transitions.jsonl is in your repo)
 transition_examples = load_transitions("transitions.jsonl")
 
 # initialize the OpenAI client
@@ -20,7 +21,8 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.title("🧠 Multi-Transition Generator (GPT-4)")
 st.markdown(
     "Paste your text with one or more `TRANSITION` markers. "
-    "The app will suggest a 5–10 word phrase for each and rebuild the text."
+    "The app will suggest a 5–10 word phrase for each, apply several post-processing rules, "
+    "and rebuild the text."
 )
 
 text_input = st.text_area("📝 Text with TRANSITION placeholders", height=300)
@@ -33,6 +35,10 @@ if st.button("✨ Generate Transitions"):
         suggestions = []
         rebuilt = parts[0]
 
+        # track which keywords/transitions we’ve already used
+        used_keywords = set()
+        used_transitions = set()
+
         for i in range(len(parts) - 1):
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
@@ -42,7 +48,7 @@ if st.button("✨ Generate Transitions"):
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
                 "connects the two sentences. Here are some examples of good transitions:\n"
-                + "\n".join(f"- {t}" for t in transition_examples[:10])  # pick first 10
+                + "\n".join(f"- {t}" for t in transition_examples[:10])
             )
 
             messages = [
@@ -58,8 +64,20 @@ if st.button("✨ Generate Transitions"):
                     max_tokens=20
                 )
                 trans = resp.choices[0].message.content.strip()
+            except Exception as e:
+                st.error(f"Error generating transition #{i+1}: {e}")
+                trans = "[ERROR]"
 
-                 # **UPDATE**: 1) lowercase after comma
+            # **POST-PROCESSING RULES**
+
+            # 1) Remove duplicate trailing article (e.g., "... la La ...")
+            lower_ctx = prev_ctx.lower()
+            for art in ("la", "le", "l'", "les"):
+                if lower_ctx.endswith(f" {art}") and trans.lower().startswith(f"{art}"):
+                    trans = trans[len(art):].lstrip()
+                    break
+
+            # 2) After a comma, lowercase the first letter of the next clause
             if "," in trans:
                 head, tail = trans.split(",", 1)
                 tail = tail.lstrip()
@@ -67,45 +85,33 @@ if st.button("✨ Generate Transitions"):
                     tail = tail[0].lower() + tail[1:]
                 trans = f"{head}, {tail}"
 
-            # **UPDATE**: 2) enforce “enfin” only as last transition
+            # 3) Enforce “enfin” only as last transition
             is_last = (i == len(parts) - 2)
             if trans.lower().startswith("enfin") and not is_last:
                 trans = trans.replace("Enfin", "De plus", 1)
 
-            # **UPDATE**: 3) enforce “par ailleurs” only once
+            # 4) Allow “par ailleurs” only once
             if "par ailleurs" in trans.lower():
                 if "par ailleurs" in used_keywords:
-                    # swap to another phrase if already used
                     trans = trans.replace("Par ailleurs", "De plus", 1)
                 else:
                     used_keywords.add("par ailleurs")
 
-            # **UPDATE**: 4) avoid exact repeats
+            # 5) Avoid exact repeats of any transition
             norm = trans.lower()
             if norm in used_transitions:
-                # simple fallback when duplicate: append “(suite)”
                 trans = trans + " (suite)"
-            used_transitions.add(trans.lower())
+            used_transitions.add(norm)
 
             suggestions.append(trans)
             rebuilt += trans + parts[i+1]
 
-                # ── **INSERT DUPLICATE-ARTICLE FILTER HERE** ──
-                lower_ctx = prev_ctx.lower()
-                for art in ("la", "le", "l'", "les"):
-                    if lower_ctx.endswith(f" {art}") and trans.lower().startswith(f"{art}"):
-                        # remove the leading article + any following space
-                        trans = trans[len(art):].lstrip()
-            except Exception as e:
-                st.error(f"Error generating transition #{i+1}: {e}")
-                trans = "[ERROR]"
-
-            suggestions.append(trans)
-            rebuilt += trans + parts[i+1]
-
+        # show each suggestion
         st.subheader("✅ Suggested Transitions")
-        for idx, trans in enumerate(suggestions, start=1):
-            st.markdown(f"{idx}. **{trans}**")
+        for idx, t in enumerate(suggestions, start=1):
+            st.markdown(f"{idx}. **{t}**")
 
+        # show final rebuilt text
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
+```
