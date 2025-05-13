@@ -34,6 +34,7 @@ if st.button("✨ Generate Transitions"):
 
         used_keywords = set()
         used_transitions = set()
+        used_prefixes = set()  # track first-segment prefixes to prevent near-duplicates
 
         for i in range(len(parts) - 1):
             prev_ctx = parts[i].strip().split("\n")[-1]
@@ -103,6 +104,22 @@ if st.button("✨ Generate Transitions"):
                 trans = trans + " (suite)"
             used_transitions.add(norm)
 
+            # 6) Prevent same-prefix repeats
+            #   define prefix as segment up to first comma or first 3 words
+            if "," in trans:
+                prefix = trans.split(",", 1)[0].lower().strip()
+                rest = trans.split(",", 1)[1].lstrip()
+            else:
+                words = trans.split()
+                prefix = " ".join(words[:3]).lower()
+                rest = " ".join(words[3:]).lstrip()
+
+            if prefix in used_prefixes:
+                # fallback: use "De plus," to vary opening
+                trans = f"De plus, {rest}" if rest else f"De plus, {prefix}"
+            else:
+                used_prefixes.add(prefix)
+
             suggestions.append(trans)
 
             # Remove overlapping text between transition end and next paragraph start
@@ -112,10 +129,7 @@ if st.button("✨ Generate Transitions"):
                 if trans.endswith(next_ctx[:l]):
                     overlap = next_ctx[:l]
                     break
-            if overlap:
-                cleaned_next = next_full[len(overlap):]
-            else:
-                cleaned_next = next_full
+            cleaned_next = next_full[len(overlap):] if overlap else next_full
 
             rebuilt += trans + cleaned_next
 
