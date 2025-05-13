@@ -39,6 +39,13 @@ if st.button("✨ Generate Transitions"):
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
 
+            # Special header handling: pass through after double line-break
+            if prev_ctx.strip() == "A savoir également dans votre département":
+                # Remove any trailing whitespace, add two line breaks, then the next content
+                rebuilt = rebuilt.rstrip() + "\n\n" + parts[i+1]
+                continue
+
+            # Build system prompt with example transitions
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
