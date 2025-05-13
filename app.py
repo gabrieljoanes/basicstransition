@@ -1,3 +1,6 @@
+Here’s the updated **app.py** with the “Final Text” section removed—only the list of suggested transitions is shown now:
+
+```python
 import streamlit as st
 from openai import OpenAI
 import json
@@ -99,21 +102,12 @@ if st.button("✨ Generate Transitions"):
             suggestions.append(trans)
             rebuilt += trans + parts[i+1]
 
-        # === FINAL CLEANUP ON FULL TEXT ===
-        # a) Lowercase article after any comma
-        rebuilt = re.sub(
-            r',\s+(Le|La|L\')',
-            lambda m: ', ' + m.group(1).lower(),
-            rebuilt
-        )
-        # b) Fix duplicated “et de Les” → “et les”
+        # Final cleanup on rebuilt (kept if you still need it later)
+        rebuilt = re.sub(r',\s+(Le|La|L\')', lambda m: ', ' + m.group(1).lower(), rebuilt)
         rebuilt = re.sub(r'\bet de Les\b', 'et les', rebuilt)
-        # c) Collapse multiple spaces
         rebuilt = re.sub(r'\s{2,}', ' ', rebuilt)
 
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
             st.markdown(f"{idx}. **{t}**")
-
-        st.subheader("📄 Final Text")
-        st.text_area("Result", rebuilt, height=300)
+```
