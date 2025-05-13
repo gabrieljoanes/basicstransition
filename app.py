@@ -39,12 +39,13 @@ if st.button("✨ Generate Transitions"):
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
 
-            # Handle departmental header with double blank lines
+            # Special header handling: pass through after double line-break
             if prev_ctx.strip() == "A savoir également dans votre département":
-                rebuilt = rebuilt.rstrip() + "\n\nA savoir également dans votre département\n\n" + parts[i+1].lstrip()
+                # Remove any trailing whitespace, add two line breaks, then the next content
+                rebuilt = rebuilt.rstrip() + "\n\n" + parts[i+1]
                 continue
 
-            # Build system prompt with sample examples
+            # Build system prompt with example transitions
             system_prompt = (
                 "You are a French news assistant that replaces the word TRANSITION "
                 "with a short, natural and context-aware phrase (5–10 words) that logically "
@@ -105,18 +106,21 @@ if st.button("✨ Generate Transitions"):
             suggestions.append(trans)
             rebuilt += trans + parts[i+1]
 
-        # Final cleanup on full text
+        # === FINAL CLEANUP ON FULL TEXT ===
+        # a) Lowercase article after any comma
         rebuilt = re.sub(
             r',\s+(Le|La|L\')',
             lambda m: ', ' + m.group(1).lower(),
             rebuilt
         )
+        # b) Fix duplicated “et de Les” → “et les”
         rebuilt = re.sub(r'\bet de Les\b', 'et les', rebuilt)
+        # c) Collapse multiple spaces
         rebuilt = re.sub(r'\s{2,}', ' ', rebuilt)
 
         st.subheader("✅ Suggested Transitions")
         for idx, t in enumerate(suggestions, start=1):
-            st.markdown(f"{idx}. {t}")
+            st.markdown(f"{idx}. **{t}**")
 
         st.subheader("📄 Final Text")
         st.text_area("Result", rebuilt, height=300)
