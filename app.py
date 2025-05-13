@@ -39,9 +39,9 @@ if st.button("✨ Generate Transitions"):
             prev_ctx = parts[i].strip().split("\n")[-1]
             next_ctx = parts[i+1].lstrip().split("\n")[0]
 
-            # Handle departmental header with bold and blank lines
+            # Handle departmental header with double blank lines
             if prev_ctx.strip() == "A savoir également dans votre département":
-                rebuilt = rebuilt.rstrip() + "\n\n**A savoir également dans votre département**\n\n" + parts[i+1].lstrip()
+                rebuilt = rebuilt.rstrip() + "\n\nA savoir également dans votre département\n\n" + parts[i+1].lstrip()
                 continue
 
             # Build system prompt with sample examples
